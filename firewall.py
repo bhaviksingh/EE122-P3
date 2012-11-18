@@ -37,6 +37,7 @@ class Firewall (object):
     else: 
       event.action.defer = True
       log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
     Deferred connection event handler.
@@ -44,6 +45,18 @@ class Firewall (object):
     handler will be called when the first actual payload data
     comes across the connection.
     """
+
+    def check_banned_subdomain(url, banned):
+      bannedlist = re.split('\.',banned)
+      urllist = re.split('\.',url)
+      path = re.split('\/', urllist[-1])
+      urllist[-1] = path[0]
+
+      for a,b in zip(reversed(bannedlist), reversed(urllist)):
+          if a != b:
+              return False
+      return True
+
     header =  str(packet.payload.payload.payload)
     banned = False
     if 'Host: ' in header: 
@@ -52,9 +65,9 @@ class Firewall (object):
             if 'Host: ' in line:
                 hostname = line.split(" ")[line.index('Host: ' ) + 1] 
                 break
-        log.debug('is http, hostname is ' + str(hostname))
         for domain in self.banned_domains:
-            if False: 
+            if check_banned_subdomain(hostname, domain): 
+                log.debug('Hostname ' + str(hostname) + ' was banned. FUCK YOU')
                 banned = True
         if banned:
             event.action.deny = True
