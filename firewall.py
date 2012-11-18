@@ -30,26 +30,21 @@ class Firewall (object):
     self.monitored_strings = {}
     self.maxLengths = {}
 
+    # port specific items
+    self.currently_timed = {}
     self.port_count = {}
     self.lastTexts = {}
-    self.lastCounts = {}
-    self.currently_timed = {}
+
 
     for line in monitored_list:
       ip, text = line.strip().split(":")
 
       if ip not in self.monitored_strings:
-        self.monitored_strings[ip] = {}
-        self.monitored_strings[ip][text] = 0
+        self.monitored_strings[ip] = [text]
         self.maxLengths[ip] = len(text)   
 
-        #port specific  
-        self.lastTexts[ip] = {}
-        self.lastCounts[ip] = {}
-        self.port_count[ip] = {}
-
       else:
-        self.monitored_strings[ip][text] = 0
+        self.monitored_strings[ip].append(text)
         self.maxLengths[ip] = max(len(text), self.maxLengths[ip])
 
   def _handle_ConnectionIn (self, event, flow, packet):
@@ -58,13 +53,24 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
-
     if str(flow.dstport) in self.banned_ports:
       event.action.deny = True
-      log.debug("Denied connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      log.debug("Denied connection [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
     else: 
       event.action.defer = True
-      log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+
+    ip = flow.dstport
+    if ip in monitored_strings:
+      
+      connection = (flow.src, flow.srcport, flow.dst, flow.dstport)
+      self.port_count[connection] = {}
+      self.lastTexts[connection] = {}
+      
+      for string in monitored_strings[ip]
+        self.port_count[connection] = {string: [0, 0]}
+        self.lastTexts[connection] = ["", ""]
+
 
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
@@ -112,56 +118,64 @@ class Firewall (object):
     Called when data passes over the connection if monitoring
     has been enabled by a prior event handler.
     """
-    ip = str(packet.payload.dstip)
-    port = str(packet.payload.payload.dstport)
 
-    if reverse:
-      ip = str(packet.payload.srcip)
-      port = str(packet.payload.payload.srcport)
+    if not reverse:
+      ip = packet.payload.srcip
+      connection = (packet.payload.srcip, packet.payload, srcport, packet.payload.dstip, packet.payload.dstport)
+      index = 0
+    else:
+      ip = packet.payload.dstip
+      connection = (packet.payload.dstip, packet.payload.dstport, packet.srcip, packet.srcport)
+      index = 1
+
+    print "Current connection is ", connection
 
     if ip in self.monitored_strings:
 
-      if port in self.lastTexts[ip]:
-        content = self.lastTexts[ip][port] + str(packet.payload.payload.payload)
-      else: 
-        #this is the first time we are seeing this port,ip, so initialize everything for lastTexts and portCount
-        self.lastTexts[ip][port] = ""
-        self.lastCounts[ip][port] = {}
-        self.port_count[ip][port] = {}
-        content = str(packet.payload.payload.payload)
-
-        for monitored in self.monitored_strings[ip]:
-          self.lastCounts[ip][port][monitored] = 0
-          self.port_count[ip][port][monitored] = 0
-
+      content  = self.lastTexts[connection][index] + str(packet.payload.payload.payload)
       subset = str(packet.payload.payload.payload)[-self.maxLengths[ip]:]
 
-      for monitored in self.monitored_strings[ip]:
-        #get the actual count for this time
-        count = content.count(monitored) - self.lastCounts[ip][port][monitored]
-        self.port_count[ip][port][monitored] += count
-        #set the subset count
-        self.lastCounts[ip][port][monitored] = subset.count(monitored)
+      for string in self.port_count[connection]:
+        count = content.count(string) - self.lastTexts[connection][index].count(string)
 
-      self.lastTexts[ip][port] = subset
+      for string in self.monitored_strings[ip]:
+        count = content.count(string) - self.lastCounts[ip][port][reverse_id][string] 
+        self.port_count[ip][port][reverse_id][string] += count
+        self.lastCounts[ip][port][reverse_id][string] = subset.count(string)
+        #print "adding count to ", ip, port, string, " count = ", count
 
-      if ip in self.currently_timed:
-        if port in self.currently_timed[ip]:
-          self.currently_timed[ip][port].cancel()
-        else:
-          self.currently_timed[ip] = {port: Timer(30, self.writeCounts, args = (ip, port))}
-      else:
-        self.currently_timed[ip] = {}
-        self.currently_timed[ip][port] =  Timer(30, self.writeCounts, args = (ip, port))
+      self.lastTexts[ip][port][reverse_id] = subset
+
+      if (ip,port) in self.currently_timed:
+        self.currently_timed[(ip, port)].cancel()
+      self.currently_timed[(ip,port)] = Timer(30, self.writeCounts, args = (ip, port))
+
+  
+  def initPortData(self, ip, port):
+    self.port_count[ip][port] = {0 : {}, 1: {}}
+    self.lastCounts[ip][port] = {0 : {}, 1: {}}
+    self.lastTexts[ip][port] = {0 : "", 1: ""}
+    for i in range(2):
+      for string in self.monitored_strings[ip]:
+        self.port_count[ip][port][i][string] = 0
+        self.lastCounts[ip][port][i][string] = 0
+
 
   def writeCounts(self, ip, port):
+    print " WRITING TO FILE FOR IP, PORT", ip , " ", port
+    print "Monitored strings is " , self.monitored_strings
+    print "Port count for this ip,port ",  self.port_count[ip][port]
+    print " "
     counts = open('ext/counts.txt', 'a')
-    for monitored in self.port_count[ip][port]:
-      line = str(ip) + ',' + str(port) + ',' + str(monitored) + ',' + str(self.port_count[ip][port][monitored]) + '\n'
+    for string in self.monitored_strings[ip]:
+      total = self.port_count[ip][port][0][string] + self.port_count[ip][port][1][string]
+      line = str(ip) + ',' + str(port) + ',' + str(string) + ',' + str(total) + '\n'
       counts.write(line)
       counts.flush()
     counts.close()
     #reset our count for the connection
-    for monitored in self.port_count[ip][port]:
-      self.port_count[ip][port][monitored] = 0
+    self.initPortData(ip, port)
+
+
+
 
