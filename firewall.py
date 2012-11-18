@@ -69,9 +69,9 @@ class Firewall (object):
       event.action.defer = True
       log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
 
-    ip = flow.dstport
+    ip = str(flow.dstport)
     if ip in self.monitored_strings:
-      connection = (flow.src, flow.srcport, flow.dst, flow.dstport)
+      connection = (str(flow.src), str(flow.srcport), str(flow.dst),  str(flow.dstport))
       self.initData(connection)
 
   def _handle_DeferredConnectionIn (self, event, flow, packet):
@@ -122,17 +122,20 @@ class Firewall (object):
     """
 
     if not reverse:
-      ip = packet.payload.srcip
-      connection = (packet.payload.srcip, packet.payload.payload.srcport, packet.payload.dstip, packet.payload.payload.dstport)
+      ip = str(packet.payload.dstip)
+      connection = (str(packet.payload.srcip), str(packet.payload.payload.srcport), str(packet.payload.dstip), str(packet.payload.payload.dstport))
       index = 0
     else:
-      ip = packet.payload.dstip
-      connection = (packet.payload.dstip, packet.payload.payload.dstport, packet.payload.srcip, packet.payload.payload.srcport)
+      ip = str(packet.payload.srcip)
+      connection = (str(packet.payload.dstip), str(packet.payload.payload.dstport), str(packet.payload.srcip), str(packet.payload.payload.srcport))
       index = 1
 
     print "Current connection is ", connection
 
     if ip in self.monitored_strings:
+
+      print "IP IS IN MONITORED, DOING OTHER SHIT ", ip
+      print "port count at this point is ", self.port_count
 
       content  = self.lastTexts[connection][index] + str(packet.payload.payload.payload)
       
@@ -144,15 +147,11 @@ class Firewall (object):
 
       if connection in self.currently_timed:
         self.currently_timed[connection].cancel()
-      self.currently_timed[connection] = Timer(30, self.writeCounts, args = (ip, port))
+      self.currently_timed[connection] = Timer(30, self.writeCounts, args = (connection))
 
 
   def writeCounts(self, connection):
-    print " WRITING TO FILE FOR IP, PORT", ip , " ", port
-    print "Monitored strings is " , self.monitored_strings
-    print "Port count for this ip,port ",  self.port_count[ip][port]
-    print " "
-    
+    print " WRITING TO FILE FOR CONNECTION", connection
     counts = open('ext/counts.txt', 'a')
     # srcip = connection[0]
     # srcport = connection[1]
