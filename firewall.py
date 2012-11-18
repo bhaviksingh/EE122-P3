@@ -47,14 +47,14 @@ class Firewall (object):
         self.monitored_strings[ip].append(text)
         self.maxLengths[ip] = max(len(text), self.maxLengths[ip])
 
-
   def initData(self,connection):
+    #print "INITIALIZING PORTCOUNT FOR ", connection
     self.port_count[connection] = {}
     self.lastTexts[connection] = {}
     
-    for string in monitored_strings[ip]:
-      self.port_count[connection] = {string: [0, 0]}
-      self.lastTexts[connection] = ["", ""]
+    for string in self.monitored_strings[connection[2]]:
+      self.port_count[connection][string] = [0, 0]
+      self.lastTexts[connection][string] = ["", ""]
 
   def _handle_ConnectionIn (self, event, flow, packet):
     """
@@ -69,10 +69,18 @@ class Firewall (object):
       event.action.defer = True
       log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
 
-    ip = str(flow.dstport)
+    ip = str(flow.dst)
     if ip in self.monitored_strings:
       connection = (str(flow.src), str(flow.srcport), str(flow.dst),  str(flow.dstport))
+       
+      if connection in self.currently_timed:
+        self.currently_timed[connection].cancel()
+        self.writeCounts(connection)
+
       self.initData(connection)
+
+     
+  
 
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
@@ -130,37 +138,53 @@ class Firewall (object):
       connection = (str(packet.payload.dstip), str(packet.payload.payload.dstport), str(packet.payload.srcip), str(packet.payload.payload.srcport))
       index = 1
 
-    print "Current connection is ", connection
+    #print "Current connection is ", connection
 
     if ip in self.monitored_strings:
 
-      print "IP IS IN MONITORED, DOING OTHER SHIT ", ip
-      print "port count at this point is ", self.port_count
+      #print "IP IS IN MONITORED, DOING OTHER SHIT ", ip
+      #print "port count at this point is ", self.port_count
 
-      content  = self.lastTexts[connection][index] + str(packet.payload.payload.payload)
       
-      for string in self.port_count[connection]:
-        count = content.count(string) - self.lastTexts[connection][index].count(string)
-        self.port_count[connection][index] += count
+      #print "NEW PACKET"
+      for string in self.monitored_strings[ip]:
+        
+        substring = self.lastTexts[connection][string][index]
+        content  = substring + str(packet.payload.payload.payload)
 
-      self.lastTexts[connection][index] = str(packet.payload.payload.payload)[-self.maxLengths[ip]:]
+        #print "For ", string, " content is ", content, " lenght is ", len(content), " substring length was ", len(substring)
+        
+        count = content.count(string) 
+        self.port_count[connection][string][index] += count
+        
+        if content.count(string) == 0:
+          self.lastTexts[connection][string][index] = content[ -(len(string) - 1):]
+        else:
+          self.lastTexts[connection][string][index] = self.lastIndex(content,string)
 
       if connection in self.currently_timed:
         self.currently_timed[connection].cancel()
-      self.currently_timed[connection] = Timer(30, self.writeCounts, args = (connection))
+      self.currently_timed[connection] = Timer(30, self.writeCounts, args = [connection])
 
+  def lastIndex(self, s, pattern):
+    while(s.find(pattern) >= 0):
+      s = s[s.find(pattern) + len(pattern):]
+    return s
 
   def writeCounts(self, connection):
-    print " WRITING TO FILE FOR CONNECTION", connection
+    #print " WRITING TO FILE FOR CONNECTION", connection
     counts = open('ext/counts.txt', 'a')
     # srcip = connection[0]
     # srcport = connection[1]
     dstip = connection[2]
     dstport = connection[3]
 
-    for string in self.monitored_strings[ip]:
-      total = self.port_count[connection][0] + self.port_count[connection][1]
+    #print "PORTCOUNT IS ", self.port_count
+
+    for string in self.monitored_strings[connection[2]]:
+      total = self.port_count[connection][string][0] + self.port_count[connection][string][1]
       line = str(dstip) + ',' + str(dstport) + ',' + str(string) + ',' + str(total) + '\n'
+      #print "writing", line
       counts.write(line)
       counts.flush()
     counts.close()
