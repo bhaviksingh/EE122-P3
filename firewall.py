@@ -27,27 +27,30 @@ class Firewall (object):
     self.banned_domains = open('ext/banned-domains.txt').read().splitlines()
     monitored_list = open('ext/monitored-strings.txt').read().splitlines()
 
-    self.monitored_counts = {}
-    self.currently_timed = {}
-    self.lastTexts = {}
+    self.monitored_strings = {}
     self.maxLengths = {}
+
+    self.port_count = {}
+    self.lastTexts = {}
+    self.lastCounts = {}
+    self.currently_timed = {}
 
     for line in monitored_list:
       ip, text = line.strip().split(":")
 
-      if ip not in self.monitored_counts:
-        self.monitored_counts[ip] = {}
-        self.monitored_counts[ip][text] = 0
-        self.maxLengths[ip] = len(text)     
-        self.lastTexts[ip] = ("", {text: 0})
+      if ip not in self.monitored_strings:
+        self.monitored_strings[ip] = {}
+        self.monitored_strings[ip][text] = 0
+        self.maxLengths[ip] = len(text)   
+
+        #port specific  
+        self.lastTexts[ip] = {}
+        self.lastCounts[ip] = {}
+        self.port_count[ip] = {}
+
       else:
-        self.monitored_counts[ip][text] = 0
+        self.monitored_strings[ip][text] = 0
         self.maxLengths[ip] = max(len(text), self.maxLengths[ip])
-        self.lastTexts[ip][1][text] = 0
-
-
-
-
 
   def _handle_ConnectionIn (self, event, flow, packet):
     """
@@ -116,35 +119,49 @@ class Firewall (object):
       ip = str(packet.payload.srcip)
       port = str(packet.payload.payload.srcport)
 
-    if ip in self.monitored_counts:
-      #reinitialize the content to make it the last times + this times
+    if ip in self.monitored_strings:
 
-      content = self.lastTexts[ip][0] + str(packet.payload.payload.payload)
+      if port in self.lastTexts[ip]:
+        content = self.lastTexts[ip][port] + str(packet.payload.payload.payload)
+      else: 
+        #this is the first time we are seeing this port,ip, so initialize everything for lastTexts and portCount
+        self.lastTexts[ip][port] = ""
+        self.lastCounts[ip][port] = {}
+        self.port_count[ip][port] = {}
+        content = str(packet.payload.payload.payload)
+
+        for monitored in self.monitored_strings[ip]:
+          self.lastCounts[ip][port][monitored] = 0
+          self.port_count[ip][port][monitored] = 0
+
       subset = str(packet.payload.payload.payload)[-self.maxLengths[ip]:]
-      subsetCount = {}
-      #lets go through each string now, and adjust weights
-      for monitored in self.monitored_counts[ip]:
-        count  = content.count(monitored) - self.lastTexts[ip][1][monitored]
-        self.monitored_counts[ip][monitored] += count
-        if monitored in subsetCount:
-          subsetCount[monitored] += subset.count(monitored)
-        else: 
-          subsetCount[monitored] = subset.count(monitored)
 
-      #make the last times the thing it needs to be for next time
-      self.lastTexts[ip] = (subset, subsetCount)
+      for monitored in self.monitored_strings[ip]:
+        #get the actual count for this time
+        count = content.count(monitored) - self.lastCounts[ip][port][monitored]
+        self.port_count[ip][port][monitored] += count
+        #set the subset count
+        self.lastCounts[ip][port][monitored] = subset.count(monitored)
+
+      self.lastTexts[ip][port] = subset
 
       if ip in self.currently_timed:
-        self.currently_timed[ip].cancel()
-      self.currently_timed[ip] = Timer(30, self.writeCounts, args = (ip, port))
-
+        if port in self.currently_timed[ip]:
+          self.currently_timed[ip][port].cancel()
+        else:
+          self.currently_timed[ip] = {port: Timer(30, self.writeCounts, args = (ip, port))}
+      else:
+        self.currently_timed[ip] = {}
+        self.currently_timed[ip][port] =  Timer(30, self.writeCounts, args = (ip, port))
 
   def writeCounts(self, ip, port):
     counts = open('ext/counts.txt', 'a')
-    for monitored in self.monitored_counts[ip]:
-      line = str(ip) + ',' + str(port) + ',' + str(monitored) + ',' + str(self.monitored_counts[ip][monitored]) + '\n'
+    for monitored in self.port_count[ip][port]:
+      line = str(ip) + ',' + str(port) + ',' + str(monitored) + ',' + str(self.port_count[ip][port][monitored]) + '\n'
       counts.write(line)
       counts.flush()
     counts.close()
-    for monitored in self.monitored_counts[ip]:
-      self.monitored_counts[ip][monitored] = 0
+    #reset our count for the connection
+    for monitored in self.port_count[ip][port]:
+      self.port_count[ip][port][monitored] = 0
+
