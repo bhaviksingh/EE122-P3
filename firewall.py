@@ -21,6 +21,8 @@ class Firewall (object):
 
     log.debug("Firewall initialized.")
     self.banned_ports = open('/root/pox/ext/banned-ports.txt').read().splitlines()
+    self.banned_domains = open('/root/pox/ext/banned-domains.txt').read().splitlines()
+
 
   def _handle_ConnectionIn (self, event, flow, packet):
     """
@@ -33,7 +35,7 @@ class Firewall (object):
       event.action.deny = True
       log.debug("Denied connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
     else: 
-      event.action.forward = True
+      event.action.defer = True
       log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
@@ -42,7 +44,23 @@ class Firewall (object):
     handler will be called when the first actual payload data
     comes across the connection.
     """
-
+    header =  str(packet.payload.payload.payload)
+    banned = False
+    if 'Host: ' in header: 
+        header = header.splitlines()
+        for line in header:
+            if 'Host: ' in line:
+                hostname = line.split(" ")[line.index('Host: ' ) + 1] 
+                break
+        log.debug('is http, hostname is ' + str(hostname))
+        for domain in self.banned_domains:
+            if False: 
+                banned = True
+        if banned:
+            event.action.deny = True
+            return
+    event.action.monitor_forward = True
+    event.action.monitor_backward = True
     
   def _handle_MonitorData (self, event, packet, reverse):
     """
@@ -50,4 +68,4 @@ class Firewall (object):
     Called when data passes over the connection if monitoring
     has been enabled by a prior event handler.
     """
-    pass
+    event.action.forward = True
