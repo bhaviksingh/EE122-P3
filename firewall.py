@@ -20,7 +20,7 @@ class Firewall (object):
     """
 
     log.debug("Firewall initialized.")
-    ports = open('/root/pox/ext/banned-ports.txt').read().splitlines()
+    self.banned_ports = open('/root/pox/ext/banned-ports.txt').read().splitlines()
 
   def _handle_ConnectionIn (self, event, flow, packet):
     """
@@ -28,13 +28,13 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
-    log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
 
     if str(flow.dstport) in self.banned_ports:
       event.action.deny = True
+      log.debug("Denied connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
     else: 
       event.action.forward = True
-
+      log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
     Deferred connection event handler.
