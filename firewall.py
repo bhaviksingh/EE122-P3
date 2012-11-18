@@ -143,7 +143,7 @@ class Firewall (object):
         count = content.count(string) - self.lastTexts[connection][index].count(string)
         self.port_count[connection][index] += count
 
-      self.lastTexts[connection][index] = str(packet.payload.payload.payload)[-self.maxLengths[ip]:]
+      self.lastTexts[connection][index] = content[-self.maxLengths[ip]:]
 
       if connection in self.currently_timed:
         self.currently_timed[connection].cancel()
