@@ -1,6 +1,7 @@
 from pox.core import core
 from pox.lib.addresses import * 
 from pox.lib.packet import *
+import re
 
 # Get a logger
 log = core.getLogger("fw")
@@ -51,7 +52,8 @@ class Firewall (object):
       urllist = re.split('\.',url)
       path = re.split('\/', urllist[-1])
       urllist[-1] = path[0]
-
+      if len(urllist) < len(bannedlist):
+        return False
       for a,b in zip(reversed(bannedlist), reversed(urllist)):
           if a != b:
               return False
@@ -67,13 +69,12 @@ class Firewall (object):
                 break
         for domain in self.banned_domains:
             if check_banned_subdomain(hostname, domain): 
-                log.debug('Hostname ' + str(hostname) + ' was banned. FUCK YOU')
+                log.debug('Hostname ' + str(hostname) + ' was banned because of ' + domain)
                 banned = True
         if banned:
             event.action.deny = True
             return
-    event.action.monitor_forward = True
-    event.action.monitor_backward = True
+    event.action.forward = True
     
   def _handle_MonitorData (self, event, packet, reverse):
     """
