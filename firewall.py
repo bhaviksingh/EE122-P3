@@ -47,6 +47,15 @@ class Firewall (object):
         self.monitored_strings[ip].append(text)
         self.maxLengths[ip] = max(len(text), self.maxLengths[ip])
 
+
+  def initData(self,connection):
+    self.port_count[connection] = {}
+    self.lastTexts[connection] = {}
+    
+    for string in monitored_strings[ip]:
+      self.port_count[connection] = {string: [0, 0]}
+      self.lastTexts[connection] = ["", ""]
+
   def _handle_ConnectionIn (self, event, flow, packet):
     """
     New connection event handler.
@@ -61,16 +70,9 @@ class Firewall (object):
       log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
 
     ip = flow.dstport
-    if ip in monitored_strings:
-      
+    if ip in self.monitored_strings:
       connection = (flow.src, flow.srcport, flow.dst, flow.dstport)
-      self.port_count[connection] = {}
-      self.lastTexts[connection] = {}
-      
-      for string in monitored_strings[ip]
-        self.port_count[connection] = {string: [0, 0]}
-        self.lastTexts[connection] = ["", ""]
-
+      self.initData(connection)
 
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
@@ -121,11 +123,11 @@ class Firewall (object):
 
     if not reverse:
       ip = packet.payload.srcip
-      connection = (packet.payload.srcip, packet.payload, srcport, packet.payload.dstip, packet.payload.dstport)
+      connection = (packet.payload.srcip, packet.payload.payload.srcport, packet.payload.dstip, packet.payload.payload.dstport)
       index = 0
     else:
       ip = packet.payload.dstip
-      connection = (packet.payload.dstip, packet.payload.dstport, packet.srcip, packet.srcport)
+      connection = (packet.payload.dstip, packet.payload.payload.dstport, packet.payload.srcip, packet.payload.payload.srcport)
       index = 1
 
     print "Current connection is ", connection
@@ -133,48 +135,38 @@ class Firewall (object):
     if ip in self.monitored_strings:
 
       content  = self.lastTexts[connection][index] + str(packet.payload.payload.payload)
-      subset = str(packet.payload.payload.payload)[-self.maxLengths[ip]:]
-
+      
       for string in self.port_count[connection]:
         count = content.count(string) - self.lastTexts[connection][index].count(string)
+        self.port_count[connection][index] += count
 
-      for string in self.monitored_strings[ip]:
-        count = content.count(string) - self.lastCounts[ip][port][reverse_id][string] 
-        self.port_count[ip][port][reverse_id][string] += count
-        self.lastCounts[ip][port][reverse_id][string] = subset.count(string)
-        #print "adding count to ", ip, port, string, " count = ", count
+      self.lastTexts[connection][index] = str(packet.payload.payload.payload)[-self.maxLengths[ip]:]
 
-      self.lastTexts[ip][port][reverse_id] = subset
-
-      if (ip,port) in self.currently_timed:
-        self.currently_timed[(ip, port)].cancel()
-      self.currently_timed[(ip,port)] = Timer(30, self.writeCounts, args = (ip, port))
-
-  
-  def initPortData(self, ip, port):
-    self.port_count[ip][port] = {0 : {}, 1: {}}
-    self.lastCounts[ip][port] = {0 : {}, 1: {}}
-    self.lastTexts[ip][port] = {0 : "", 1: ""}
-    for i in range(2):
-      for string in self.monitored_strings[ip]:
-        self.port_count[ip][port][i][string] = 0
-        self.lastCounts[ip][port][i][string] = 0
+      if connection in self.currently_timed:
+        self.currently_timed[connection].cancel()
+      self.currently_timed[connection] = Timer(30, self.writeCounts, args = (ip, port))
 
 
-  def writeCounts(self, ip, port):
+  def writeCounts(self, connection):
     print " WRITING TO FILE FOR IP, PORT", ip , " ", port
     print "Monitored strings is " , self.monitored_strings
     print "Port count for this ip,port ",  self.port_count[ip][port]
     print " "
+    
     counts = open('ext/counts.txt', 'a')
+    # srcip = connection[0]
+    # srcport = connection[1]
+    dstip = connection[2]
+    dstport = connection[3]
+
     for string in self.monitored_strings[ip]:
-      total = self.port_count[ip][port][0][string] + self.port_count[ip][port][1][string]
-      line = str(ip) + ',' + str(port) + ',' + str(string) + ',' + str(total) + '\n'
+      total = self.port_count[connection][0] + self.port_count[connection][1]
+      line = str(dstip) + ',' + str(dstport) + ',' + str(string) + ',' + str(total) + '\n'
       counts.write(line)
       counts.flush()
     counts.close()
-    #reset our count for the connection
-    self.initPortData(ip, port)
+    self.initData(connection)
+
 
 
 
