@@ -28,8 +28,8 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
-    print "ports are ", ports
     log.debug("Allowed connection [" + str(flow.src) + ":" + str(flow.srcport) + "," + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+
     if str(flow.dstport) in self.banned_ports:
       event.action.deny = True
     else: 
@@ -42,7 +42,7 @@ class Firewall (object):
     handler will be called when the first actual payload data
     comes across the connection.
     """
-    pass
+
     
   def _handle_MonitorData (self, event, packet, reverse):
     """
