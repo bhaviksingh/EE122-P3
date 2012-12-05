@@ -112,7 +112,7 @@ class Firewall (object):
     #timer stuff
     if port in self.timers:
       self.timers[port].cancel()
-     self.timers[port] = Timer(10, self.timeOut, args = [port])
+    self.timers[port] = Timer(10, self.timeOut, args = [port])
 
   def timeOut(self, port):
     log.debug("REMOVING SOME PORT FROM WHITELIST")
