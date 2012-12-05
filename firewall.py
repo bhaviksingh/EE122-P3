@@ -32,14 +32,21 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
-    if flow.dstport == 21:
+   port = flow.dstport
+
+    if port == 21:
+      log.debug("CONNECTIONIN: FTP [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
       event.action.defer = True
-    if flow.dstport <= 1023:
-      event.action.defer = True
-    connection = (str(flow.src), str(flow.srcport), str(flow.dst), flow(flow.dstport))
-    if connection in self.white_list:
-      event.action.defer = True
-  
+    elif port < 1024:
+      log.debug("CONNECTIONIN: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      event.action.forward = True
+    elif port in self.white_list:
+      log.debug("WHITELIST: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]")
+      event.action.forward = True
+    else:
+      log.debug("CONNECTIONIN: DENIED [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" ) 
+      event.action.deny = True
+
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
     Deferred connection event handler.
@@ -47,6 +54,10 @@ class Firewall (object):
     handler will be called when the first actual payload data
     comes across the connection.
     """
+    log.debug("Defer connection called")
+
+    event.action.monitor_forward = True
+    event.action.monitor_backward = True
 
   def _handle_MonitorData (self, event, packet, reverse):
     """
@@ -54,3 +65,26 @@ class Firewall (object):
     Called when data passes over the connection if monitoring
     has been enabled by a prior event handler.
     """
+
+    def match(s):
+      if "227" in s or "229" in s:
+        ret = s.splitlines()[-1:][0].split()[-1:][0]
+        log.debug("RETURNING PORT P AS ", str(ret))
+        return int(ret)
+      else:
+        return None
+
+    if not reverse:
+      port =  packet.payload.payload.dstport
+    else:
+      return
+
+    data = packet.payload.payload.payload
+
+    log.debug("monitor called to:" + str(port) + " data was " + str(data))
+    p  = match(str(date))
+    if p:
+      self.white_list.append(p)
+    
+
+
