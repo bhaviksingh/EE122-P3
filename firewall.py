@@ -77,6 +77,6 @@ class Firewall (object):
     if "227" in data:
       log.debug("PASV PACKET")
     elif "229" in data:
-      log.deug("EPSV PACKET")
+      log.debug("EPSV PACKET")
 
 
