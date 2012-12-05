@@ -66,13 +66,24 @@ class Firewall (object):
     has been enabled by a prior event handler.
     """
 
-    def match(s):
-      if "227" in s or "229" in s:
-        ret = s.splitlines()[-1:][0].split()[-1:][0]
-        log.debug("RETURNING PORT P AS ", str(ret))
-        return int(ret)
-      else:
-        return None
+    def match(packet):
+    #print packet
+    if re.match(r"^227",packet):
+      lastline = packet.splitlines()[-1]
+      code = lastline.split(" ")[-1] 
+      values = code.split(",")
+      port = int(values [4])*256 + int(values[5].split(")")[0])
+      log.debug("MATCHED PACKET, returning port", port)
+      return port
+    elif re.match(r"^229",packet):
+      lastline = packet.splitlines()[-1]
+      code = lastline.split(" ")[-1] 
+      value = code.split("(|||")[1]
+      port = int(value.split("|)")[0])
+      log.debug("MATCHED PACKET, returning port", port)
+      return port
+    else:
+      return None
 
     if not reverse:
       port =  packet.payload.payload.dstport
