@@ -40,8 +40,11 @@ class Firewall (object):
     elif port < 1024:
       log.debug("CONNECTIONIN: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
       event.action.forward = True
+    elif port in white_list:
+      log.debug("WHITELIST: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]")
+      event.action.forward = True
     else:
-      log.debug("CONNECTIONIN: DENIED [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      log.debug("CONNECTIONIN: DENIED [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" ) 
       event.action.deny = True
 
   def _handle_DeferredConnectionIn (self, event, flow, packet):
@@ -52,7 +55,10 @@ class Firewall (object):
     comes across the connection.
     """
     log.debug("Defer connection called")
-    event.action.forward = True
+
+    event.action.monitor_forward = True
+    event.action.monitor_backward = True
+
 
   def _handle_MonitorData (self, event, packet, reverse):
     """
@@ -60,3 +66,17 @@ class Firewall (object):
     Called when data passes over the connection if monitoring
     has been enabled by a prior event handler.
     """
+    if not reverse:
+      port =  packet.payload.payload.dstport
+    else:
+      return
+
+    data = packet.payload.payload.payload
+
+    log.debug("monitor called to:" + str(port) + " data was " + str(data))
+    if "227" in data:
+      log.debug("PASV PACKET")
+    elif "229" in data:
+      log.deug("EPSV PACKET")
+
+
