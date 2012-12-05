@@ -32,8 +32,14 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
+    if flow.dstport == 21:
+      event.action.defer = True
+    if flow.dstport <= 1023:
+      event.action.defer = True
+    connection = (str(flow.src), str(flow.srcport), str(flow.dst), flow(flow.dstport))
+    if connection in self.white_list:
+      event.action.defer = True
   
-
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
     Deferred connection event handler.
