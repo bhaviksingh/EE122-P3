@@ -25,6 +25,7 @@ class Firewall (object):
     log.debug("Firewall initialized.")
     # k,v = conection,timer
     self.white_list = []
+    self.timers = {}
 
   def _handle_ConnectionIn (self, event, flow, packet):
     """
@@ -34,15 +35,26 @@ class Firewall (object):
     """
     port = flow.dstport
 
+    #ftp
     if port == 21:
       log.debug("CONNECTIONIN: FTP [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
       event.action.defer = True
+
+    #general
     elif port < 1024:
       log.debug("CONNECTIONIN: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
       event.action.forward = True
+
+    #whitelist
     elif port in self.white_list:
       log.debug("WHITELIST: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]")
-      event.action.forward = True
+      if port not in timers:
+        self.timers[port] = Timer(10, self.timeOut, args = [port])
+      else:
+        log.debug("OMG ERRRRORR: We have a timer for " + str(port) + " already, new SYN received")
+      event.action.defer = True
+
+    #we hate it
     else:
       log.debug("CONNECTIONIN: DENIED [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" ) 
       event.action.deny = True
@@ -96,6 +108,17 @@ class Firewall (object):
     p  = match(str(data))
     if p:
       self.white_list.append(p)
+
+    #timer stuff
+    if port in self.timers:
+      self.timers[port].cancel()
+     self.timers[port] = Timer(10, self.timeOut, args = [port])
+
+  def timeOut(self, port):
+    log.debug("REMOVING SOME PORT FROM WHITELIST")
+    self.white_list.remove(port)
+    del self.timers[port]
+
     
 
 
