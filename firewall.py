@@ -59,13 +59,21 @@ class Firewall (object):
     event.action.monitor_forward = True
     event.action.monitor_backward = True
 
-
   def _handle_MonitorData (self, event, packet, reverse):
     """
     Monitoring event handler.
     Called when data passes over the connection if monitoring
     has been enabled by a prior event handler.
     """
+
+    def match(s):
+      if "227" in s or "229" in s:
+        ret = s.splitlines()[-1:][0].split()[-1:][0]
+        log.debug("RETURNING PORT P AS ", ret)
+        return ret
+      else:
+        return None
+
     if not reverse:
       port =  packet.payload.payload.dstport
     else:
@@ -74,9 +82,9 @@ class Firewall (object):
     data = packet.payload.payload.payload
 
     log.debug("monitor called to:" + str(port) + " data was " + str(data))
-    if "227" in data:
-      log.debug("PASV PACKET")
-    elif "229" in data:
-      log.debug("EPSV PACKET")
+    p  = match(str(date))
+    if p:
+      self.white_list.append(p)
+    
 
 
