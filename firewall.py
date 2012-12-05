@@ -85,7 +85,7 @@ class Firewall (object):
     else:
       return None
 
-    if not reverse:
+    if reverse:
       port =  packet.payload.payload.dstport
     else:
       return
