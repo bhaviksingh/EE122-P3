@@ -24,7 +24,7 @@ class Firewall (object):
 
     log.debug("Firewall initialized.")
     # k,v = conection,timer
-    self.white_list = {}
+    self.white_list = []
 
   def _handle_ConnectionIn (self, event, flow, packet):
     """
@@ -73,14 +73,14 @@ class Firewall (object):
         code = lastline.split(" ")[-1] 
         values = code.split(",")
         port = int(values [4])*256 + int(values[5].split(")")[0])
-        log.debug("MATCHED PACKET, returning port", port)
+        log.debug("MATCHED PACKET, returning port", str(port))
         return port
       elif re.match(r"^229",packet):
         lastline = packet.splitlines()[-1]
         code = lastline.split(" ")[-1] 
         value = code.split("(|||")[1]
         port = int(value.split("|)")[0])
-        log.debug("MATCHED PACKET, returning port", port)
+        log.debug("MATCHED PACKET, returning port", str(port))
         return port
       else:
         return None
