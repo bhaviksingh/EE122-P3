@@ -48,7 +48,7 @@ class Firewall (object):
     #whitelist
     elif port in self.white_list:
       log.debug("WHITELIST: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]")
-      if port not in timers:
+      if port not in self.timers:
         self.timers[port] = Timer(10, self.timeOut, args = [port])
       else:
         log.debug("OMG ERRRRORR: We have a timer for " + str(port) + " already, new SYN received")
