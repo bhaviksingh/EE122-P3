@@ -40,7 +40,7 @@ class Firewall (object):
     elif port < 1024:
       log.debug("CONNECTIONIN: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
       event.action.forward = True
-    elif port in white_list:
+    elif port in self.white_list:
       log.debug("WHITELIST: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]")
       event.action.forward = True
     else:
