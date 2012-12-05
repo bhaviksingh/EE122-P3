@@ -22,7 +22,7 @@ class Firewall (object):
     Put your initialization code here.
     """
 
-    log.debug("Firewall initialized.")
+    self.debug_print("Firewall initialized.")
     # k,v = conection,timer
     self.white_list = []
     self.timers = {}
@@ -34,29 +34,36 @@ class Firewall (object):
     action property of the event.
     """
     port = flow.dstport
+    dst = str(flow.dst)
+    connection = (dst, port)
+    packet_info = "[" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]"
+    self.debug_print("Connection is " + str(connection) + " whitelist is " + str(self.white_list))  
 
     #ftp
     if port == 21:
-      log.debug("CONNECTIONIN: FTP [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
-      event.action.defer = True
+      self.debug_print("DEFERED: FTP" + packet_info )
+      event.action.monitor_forward = True
+      event.action.monitor_backward = True
 
     #general
     elif port < 1024:
-      log.debug("CONNECTIONIN: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      self.debug_print("FORWARDED: " + packet_info )
       event.action.forward = True
 
     #whitelist
-    elif port in self.white_list:
-      log.debug("WHITELIST: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]")
-      if port not in self.timers:
-        self.timers[port] = Timer(10, self.timeOut, args = [port])
+    elif connection in self.white_list:
+      self.debug_print("DEFERED: WHITELIST" + packet_info)
+      if connection not in self.timers:
+        self.timers[connection] = Timer(10, self.timeOut, args = [connection])
       else:
-        log.debug("OMG ERRRRORR: We have a timer for " + str(port) + " already, new SYN received")
-      event.action.defer = True
+        self.debug_print("Error" + packet_info)
+
+      event.action.monitor_forward = True
+      event.action.monitor_backward = True
 
     #we hate it
     else:
-      log.debug("CONNECTIONIN: DENIED [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" ) 
+      self.debug_print("DENIED: " + packet_info) 
       event.action.deny = True
 
   def _handle_DeferredConnectionIn (self, event, flow, packet):
@@ -66,10 +73,7 @@ class Firewall (object):
     handler will be called when the first actual payload data
     comes across the connection.
     """
-    log.debug("Defer connection called")
-
-    event.action.monitor_forward = True
-    event.action.monitor_backward = True
+    #NOTHING COMES HERE!!!!!!
 
   def _handle_MonitorData (self, event, packet, reverse):
     """
@@ -80,45 +84,60 @@ class Firewall (object):
 
     def match(packet):
     #print packet
+      self.debug_print("packet is" + str(packet))
+
       if re.match(r"^227",packet):
         lastline = packet.splitlines()[-1]
         code = lastline.split(" ")[-1] 
         values = code.split(",")
+        if len(values) != 6:
+            return None
+        self.debug_print("values is " + str(values))
         port = int(values [4])*256 + int(values[5].split(")")[0])
-        log.debug("MATCHED PACKET, returning port" +  str(port))
-        return port
+        h0 = values[0].split("(")[1]
+        h1 = values[1]
+        h2 = values[2]
+        h3 = values[3]
+        ip = h0 + "." + h1 + "." + h2 + "." + h3
+        return ip, port
       elif re.match(r"^229",packet):
         lastline = packet.splitlines()[-1]
         code = lastline.split(" ")[-1] 
         value = code.split("(|||")[1]
+        self.debug_print("value is " + value)
         port = int(value.split("|)")[0])
-        log.debug("MATCHED PACKET, returning port" + str(port))
-        return port
+        #TODO: where do we get the ip for for this case
+        return None, port
       else:
         return None
 
     if reverse:
-      port =  packet.payload.payload.dstport
+      port =  packet.payload.payload.srcport
+      dstip = str(packet.payload.srcip)
     else:
       return
 
-    data = packet.payload.payload.payload
-
-    log.debug("monitor called to:" + str(port) + " data was " + str(data))
-    p  = match(str(data))
-    if p:
-      self.white_list.append(p)
-
-    #timer stuff
-    if port in self.timers:
-      self.timers[port].cancel()
-      self.timers[port] = Timer(10, self.timeOut, args = [port])
-
-  def timeOut(self, port):
-    log.debug("REMOVING SOME PORT FROM WHITELIST")
-    self.white_list.remove(port)
-    del self.timers[port]
-
     
+    connection = (port,dstip)
+    #data packet, reset time if we've seen it before
+    if connection in self.timers:
+      self.timers[connection].cancel()
+      self.timers[connection] = Timer(10, self.timeOut, args = [connection])
+    else:
+      data = packet.payload.payload.payload
+      connection  = match(str(data))
+      #command packet, reply to passive
+      if connection:
+        if not connection[0]:
+          connection = (dstip, connection[1])
+        self.white_list.append(connection)
 
 
+  def timeOut(self, connection):
+    self.debug_print("REMOVING SOME PORT FROM WHITELIST")
+    self.white_list.remove(connection)
+    del self.timers[connection]
+
+  def debug_print(self, s):
+    if True:
+      log.debug(s)
