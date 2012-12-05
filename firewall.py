@@ -69,8 +69,8 @@ class Firewall (object):
     def match(s):
       if "227" in s or "229" in s:
         ret = s.splitlines()[-1:][0].split()[-1:][0]
-        log.debug("RETURNING PORT P AS ", ret)
-        return ret
+        log.debug("RETURNING PORT P AS ", str(ret))
+        return int(ret)
       else:
         return None
 
