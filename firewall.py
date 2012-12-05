@@ -32,7 +32,7 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
-   port = flow.dstport
+    port = flow.dstport
 
     if port == 21:
       log.debug("CONNECTIONIN: FTP [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
