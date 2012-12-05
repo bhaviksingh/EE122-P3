@@ -32,7 +32,17 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
-  
+    port = flow.dstport
+
+    if port == 21:
+      log.debug("CONNECTIONIN: FTP [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      event.action.defer = True
+    elif port < 1024:
+      log.debug("CONNECTIONIN: " + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      event.action.forward = True
+    else:
+      log.debug("CONNECTIONIN: DENIED [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
+      event.action.deny = True
 
   def _handle_DeferredConnectionIn (self, event, flow, packet):
     """
@@ -41,6 +51,8 @@ class Firewall (object):
     handler will be called when the first actual payload data
     comes across the connection.
     """
+    log.debug("Defer connection called")
+    event.action.forward = True
 
   def _handle_MonitorData (self, event, packet, reverse):
     """
