@@ -32,7 +32,7 @@ class Firewall (object):
     You can alter what happens with the connection by altering the
     action property of the event.
     """
-   port = flow.dstport
+    port = flow.dstport
 
     if port == 21:
       log.debug("CONNECTIONIN: FTP [" + str(flow.src) + ":" + str(flow.srcport) + " to " + str(flow.dst) + ":" + str(flow.dstport) + "]" )
@@ -67,24 +67,8 @@ class Firewall (object):
     """
 
     def match(packet):
-    #print packet
-    if re.match(r"^227",packet):
-      lastline = packet.splitlines()[-1]
-      code = lastline.split(" ")[-1] 
-      values = code.split(",")
-      port = int(values [4])*256 + int(values[5].split(")")[0])
-      log.debug("MATCHED PACKET, returning port", port)
-      return port
-    elif re.match(r"^229",packet):
-      lastline = packet.splitlines()[-1]
-      code = lastline.split(" ")[-1] 
-      value = code.split("(|||")[1]
-      port = int(value.split("|)")[0])
-      log.debug("MATCHED PACKET, returning port", port)
-      return port
-    else:
       return None
-
+  
     if reverse:
       port =  packet.payload.payload.dstport
     else:
