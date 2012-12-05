@@ -93,7 +93,7 @@ class Firewall (object):
     data = packet.payload.payload.payload
 
     log.debug("monitor called to:" + str(port) + " data was " + str(data))
-    p  = match(str(date))
+    p  = match(str(data))
     if p:
       self.white_list.append(p)
     
