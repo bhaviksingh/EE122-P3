@@ -155,7 +155,7 @@ class Firewall (object):
     the s is the string, the t variable is to override the if statement in case we want to print just one or two messages
     """
     if False or t:
-      print s
+      log.debug(s)
 
   #plz ignore this match function. its a mess and could be much cleaner
   def match(self, line):
@@ -190,8 +190,8 @@ class Firewall (object):
     elif re.match(r"^229", line):
       if not re.match(r"^229", line):
         return None
-      code = line.split(" ")[-1]
-      if not re.match(r"\(\|\|\|.*\|\)\.?$", code):
+      code = "(" + line.split(" ")[-1].split("(")[-1]
+      if not re.match(r"^\(\|\|\|.*\|\)\.?$", code):
         return None
       port = code.strip(".").strip("(").strip(")").strip("|")
       if not port.isdigit():
