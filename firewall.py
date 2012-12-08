@@ -110,7 +110,7 @@ class Firewall (object):
     else:
       return
     
-    connection = (port, dstip)
+    connection = (dstip, port)
     if connection not in self.lastPacket:
       self.lastPacket[connection] = ""
 
@@ -168,7 +168,8 @@ class Firewall (object):
       if not re.match(r"^227", line):
         return None
       code = line.split(" ")[-1] 
-      if re.match(r"\(.*\)\.?", code):
+      if re.match(r".*\(.*\)\.?$", code):
+        code = code.split("(")[-1] 
         code = code.strip(".").strip("(").strip(")")
       values = code.split(",")
       if len(values) != 6:
@@ -190,7 +191,7 @@ class Firewall (object):
       if not re.match(r"^229", line):
         return None
       code = line.split(" ")[-1]
-      if not re.match(r"\(\|\|\|.*\|\)\.?", code):
+      if not re.match(r"\(\|\|\|.*\|\)\.?$", code):
         return None
       port = code.strip(".").strip("(").strip(")").strip("|")
       if not port.isdigit():
@@ -201,3 +202,5 @@ class Firewall (object):
       return None, int(port)
     else:
       return None
+
+
